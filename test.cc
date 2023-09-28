@@ -48,12 +48,11 @@ std::pair<double, double> calculateAverageAndStdDevMilliseconds(std::vector<doub
 
 int main()
 {
-    int num_iterations = 35;
+    int num_iterations = 1;
     std::vector<double> durations;
     for (int idx = 0; idx < num_iterations; idx++) {
-        auto start_time = std::chrono::high_resolution_clock::now();
         // Open a file for memory mapping
-        int fd = open("temp.txt", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        int fd = open("file-1g", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fd == -1)
         {
         perror("open");
@@ -69,7 +68,7 @@ int main()
         }
         
         // Memory map the file
-        uint8_t *mapped_region = static_cast<uint8_t *>(mmap(nullptr, REGION_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+        uint8_t *mapped_region = static_cast<uint8_t *>(mmap(nullptr, REGION_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0));
         if (mapped_region == MAP_FAILED)
         {
             perror("mmap");
@@ -89,23 +88,27 @@ int main()
         srand(static_cast<unsigned int>(time(nullptr)));
         shuffle(page_indices, num_pages);
 
+        auto start_time = std::chrono::high_resolution_clock::now();
         // Write the first byte of each page in the shuffled order
         for (size_t i = 0; i < num_pages; i++)
         {
             // std::cout << i << std::endl;
             mapped_region[page_indices[i]] = 0xFF; // Write the first byte of the page
         }
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+
         // Sync changes to the disk
         if (msync(mapped_region, REGION_SIZE, MS_SYNC) == -1)
         {
             perror("msync");
         }
+
         
         // Clean up and close the file
         delete[] page_indices;
         munmap(mapped_region, REGION_SIZE);
         close(fd);
-        auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
         durations.push_back(duration.count());
     }
